@@ -1,1 +1,1 @@
-The Starship game is based on code provided by J. Hunt in his book 'Advanced Python Programming'. This current implementation builds upon the original features presented in the book to create a ready-to-play experience.
+The Starship game is inspired by the 'Starship Meteors' game described by J. Hunt in his book 'Advanced Python Programming'. This implementation intends to build upon the original concept to create fuller gaming experience.
