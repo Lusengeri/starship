@@ -2,9 +2,12 @@ import pygame
 from pygame.locals import *
 from vector2 import Vector2
 
-SCREEN_SIZE = (640, 480)
+import time
+
+SCREEN_SIZE = (1366, 768)
 BLACK = (0, 0, 0)
 SPACECRAFT_SPEED = 400
+INTRO_SCREEN_FILE = "SplashScreenImage.png"
 
 class World():
     def __init__(self, surface):
@@ -79,11 +82,18 @@ def exit_procedure():
 
 def main():
     pygame.init()
-
-    display_surface = pygame.display.set_mode(SCREEN_SIZE, FULLSCREEN, 32)
-    pygame.display.set_caption("Starship Odyssey")
+    display_surface = pygame.display.set_mode(SCREEN_SIZE, FULLSCREEN)
     pygame.mouse.set_visible(False)
 
+    #Set-up intro Screen
+    intro_screen_image = pygame.image.load(INTRO_SCREEN_FILE).convert_alpha()
+    i_w, i_h = intro_screen_image.get_size()
+    display_surface.blit(intro_screen_image, ((SCREEN_SIZE[0]/2)-(i_w/2), (SCREEN_SIZE[1]/2)-(i_h/2)))
+    pygame.display.update()
+
+    time.sleep(7)
+
+    #Set-up main game-playing screen
     clock = pygame.time.Clock()
     space_craft = Starship((SCREEN_SIZE[0]/2.0), (SCREEN_SIZE[1]-100))
     world = World(display_surface)
@@ -92,7 +102,7 @@ def main():
     while True:
         for event in pygame.event.get():        
             if event.type == pygame.QUIT:
-                exit_procedure()
+                exit_procedure() 
             elif event.type == KEYDOWN:
                 if event.key == K_q:
                     exit_procedure()
