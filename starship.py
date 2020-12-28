@@ -116,6 +116,7 @@ def display_intro_screen(surface):
     time.sleep(3)
 
 def display_exit_prompt(surface):
+    surface.fill((0, 0, 0, 0.5))
     question = "Are you sure you want to exit?"
     options = "Yes / No"
     question_font = pygame.font.SysFont("inconsolata", 32)
@@ -133,6 +134,30 @@ def display_exit_prompt(surface):
                 if event.key == K_y:
                     exit_procedure()
                 elif event.key == K_n:
+                    return
+
+def display_about_menu(surface):
+    surface.fill((0, 0, 0, 0.5))
+    title_font = pygame.font.SysFont("inconsolata", 32, bold=True)
+    title_surface = title_font.render("About Starship Odyssey", True, WHITE, BLACK)
+    title_width, title_height = title_surface.get_size()
+    surface.blit(title_surface, (SCREEN_SIZE[0]/2 - title_width/2, SCREEN_SIZE[1]/2 - 50))
+    text_font = pygame.font.SysFont("inconsolata", 16)
+
+    about_file = open("README.md", "r", 1)
+    
+    for line in about_file:
+        text_surface = text_font.render(line, True, WHITE, BLACK)
+        text_width, text_height = text_surface.get_size()
+        surface.blit(text_surface, (40, SCREEN_SIZE[1]/2))
+
+    pygame.display.update()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    about_file.close()
                     return
 
 def display_game_menu(surface):
@@ -167,8 +192,7 @@ def display_game_menu(surface):
                     #Display high-score table
                     print()
                 elif event.key == K_a:
-                    #Display about menu
-                    print()
+                    display_about_menu(surface)
                 elif event.key == K_ESCAPE:
                     display_exit_prompt(surface)
 
