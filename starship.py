@@ -104,7 +104,7 @@ class Starship(GameAsset):
 class Meteor(GameAsset):
     pass
 
-def exit_procedure(surface):
+def exit_procedure():
     pygame.quit()
     exit()
 
@@ -114,6 +114,26 @@ def display_intro_screen(surface):
     surface.blit(intro_screen_image, ((SCREEN_SIZE[0]/2)-(i_w/2), (SCREEN_SIZE[1]/2)-(i_h/2)))
     pygame.display.update()
     time.sleep(3)
+
+def display_exit_prompt(surface):
+    question = "Are you sure you want to exit?"
+    options = "Yes / No"
+    question_font = pygame.font.SysFont("inconsolata", 32)
+    options_font = pygame.font.SysFont("inconsolata", 24)
+    question_surface = question_font.render(question, True, WHITE, BLACK)
+    options_surface = options_font.render(options, True, WHITE, BLACK)
+    q_w, q_h = question_surface.get_size()
+    surface.blit(question_surface, (SCREEN_SIZE[0]/2 - q_w/2,  SCREEN_SIZE[1]/2))
+    surface.blit(options_surface, (SCREEN_SIZE[0]/2 - q_w/2 + 120,  SCREEN_SIZE[1]/2 + 40))
+    pygame.display.update()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == KEYDOWN:
+                if event.key == K_y:
+                    exit_procedure()
+                elif event.key == K_n:
+                    return
 
 def display_game_menu(surface):
     running = True
@@ -145,10 +165,13 @@ def display_game_menu(surface):
                     new_game.play()
                 elif event.key == K_h:
                     #Display high-score table
+                    print()
                 elif event.key == K_a:
                     #Display about menu
+                    print()
                 elif event.key == K_ESCAPE:
-                    exit_procedure(surface)
+                    display_exit_prompt(surface)
+
         pygame.display.update()
 
 def main():
