@@ -31,7 +31,7 @@ class Game(object):
         self.starship = starship
         self.game_objects.append(starship)
         for _ in range(10):
-            meteor_speed = randint(400, 600) * 1.0
+            meteor_speed = randint(800, 1000) * 1.0
             x_location = randint(0, SCREEN_SIZE[0])
             meteor = Meteor(self, x_location, 0, meteor_speed)
             self.game_objects.append(meteor)
@@ -42,12 +42,19 @@ class Game(object):
             if asset.type == "meteor":
                 if self.starship.rect.colliderect(asset.rect):
                     self.paused = True
-                    display_game_over_screen(self.game_screen)
+                    self.display_game_over_screen()
 
     def render(self):
         #Draw all game artifacts here
         for asset in self.game_objects:
             asset.render(self.game_screen)
+
+        self.display_score()
+
+    def display_score(self):
+        score_font = pygame.font.SysFont("inconsolata", 32, bold=True)
+        score_surface = score_font.render("SCORE:" + str(self.score), True, WHITE, BLACK)
+        self.game_screen.blit(score_surface, (0, 0))
 
     def play(self):
         self.paused = False
@@ -63,6 +70,27 @@ class Game(object):
             self.update(time_passed)
             self.render()
             pygame.display.update()
+
+    def display_game_over_screen(self):
+        self.game_screen.fill((0, 0, 0, 0.5))
+        title_font = pygame.font.SysFont("inconsolata", 32, bold=True)
+        title_surface = title_font.render("Game Over!", True, WHITE, BLACK)
+        title_width, title_height = title_surface.get_size()
+        self.game_screen.blit(title_surface, (SCREEN_SIZE[0]/2 - title_width/2, SCREEN_SIZE[1]/2 - 50))
+        text_font = pygame.font.SysFont("inconsolata", 28)
+        text_surface = text_font.render("Collision", True, WHITE, BLACK)
+        text_width, text_height = text_surface.get_size()
+        self.game_screen.blit(text_surface, (SCREEN_SIZE[0]/2 -text_width/2, SCREEN_SIZE[1]/2))
+        score_surface = text_font.render("Your Score: " + str(self.score), True, WHITE, BLACK)
+        score_width, score_height = score_surface.get_size()
+        self.game_screen.blit(score_surface, (SCREEN_SIZE[0]/2 -score_width/2, SCREEN_SIZE[1]/2 + score_height))
+        pygame.display.update()
+
+        while True:
+            for event in pygame.event.get():
+                if event.type == KEYDOWN:
+                    if event.key == K_ESCAPE:
+                        return
 
 class GameAsset(object):
     def __init__(self, world, x_location = 0.0, y_location = 0.0):
@@ -115,7 +143,6 @@ class Starship(GameAsset):
             self.location.y = SCREEN_SIZE[1] - self.image_h
         elif self.location.y < self.image_h:
             self.location.y = self.image_h
-
 
 class Meteor(GameAsset):
     def __init__(self, world, x_location=0.0, y_location=0.0, speed=100.0):
@@ -255,7 +282,6 @@ def main():
     pygame.mouse.set_visible(False)
     #Start the game with splash creen
     display_intro_screen(display_surface)
-    #display_game_menu(display_surface)
 
 if __name__ == "__main__":
     main()
