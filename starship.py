@@ -1,14 +1,18 @@
 import pygame
 from pygame.locals import *
 from vector2 import Vector2
-import time
 from random import randint
+import time
+import csv
 
 SCREEN_SIZE = (1366, 768)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 SPACECRAFT_SPEED = 400
 INTRO_SCREEN_FILE = "images/SplashScreenImage.png"
+
+class GameApp():
+        pass
 
 class Player(object):
     def __init__(self, name, highest_score):
@@ -42,7 +46,18 @@ class Game(object):
             if asset.type == "meteor":
                 if self.starship.rect.colliderect(asset.rect):
                     self.paused = True
+                    self.update_user_data()
                     self.display_game_over_screen()
+    
+    def update_user_data(self):
+        player_list = get_player_list()     
+        for item in player_list:
+            if item[0] == self.player.name:
+                if int(item[1]) < self.score:
+                    self.player.high_score = self.score
+                    item[1] = str(self.score)
+
+        update_player_list(player_list)
 
     def render(self):
         #Draw all game artifacts here
@@ -50,11 +65,17 @@ class Game(object):
             asset.render(self.game_screen)
 
         self.display_score()
+        self.display_player_stats()
 
     def display_score(self):
         score_font = pygame.font.SysFont("inconsolata", 32, bold=True)
         score_surface = score_font.render("SCORE:" + str(self.score), True, WHITE, BLACK)
         self.game_screen.blit(score_surface, (0, 0))
+
+    def display_player_stats(self):
+        player_font = pygame.font.SysFont("inconsolata", 32, bold=True)
+        player_surface = player_font.render("PLAYER: " + str(self.player.name) + " HIGH SCORE: " + str(self.player.high_score), True, WHITE, BLACK)
+        self.game_screen.blit(player_surface, (0, 40))
 
     def play(self):
         self.paused = False
@@ -172,8 +193,121 @@ def display_intro_screen(surface):
     surface.blit(intro_screen_image, ((SCREEN_SIZE[0]/2)-(i_w/2), (SCREEN_SIZE[1]/2)-(i_h/2)))
     pygame.display.update()
     time.sleep(3)
-    display_game_menu(surface)
+    display_player_selection(surface)
 
+def get_player_list():
+    player_list = []
+    with open("user_data/player_data.csv") as player_data_file:
+        reader = csv.reader(player_data_file)
+        for row in reader:
+            player_name = row[0]
+            high_score = row[1]
+            player_list.append([player_name, high_score])
+    
+    return player_list
+
+def update_player_list(new_player_list):
+    with open("user_data/player_data.csv", "w") as player_data_file:
+        field_names = ["name", "score"]
+        writer = csv.DictWriter(player_data_file, fieldnames=field_names)
+        for row in new_player_list:
+            writer.writerow({"name": row[0], "score": row[1]})
+
+def display_player_selection(surface):
+    #Clear the screen
+    surface.fill(BLACK)
+
+    #Create the text to display the options available
+    title_font = pygame.font.SysFont("Inconsolata", 32)
+    title1_surface = title_font.render("SELECT A PLAYER", True, WHITE, BLACK)
+    title2_surface = title_font.render("TO CREATE A NEW PLAYER\n (press C)", True, WHITE, BLACK)
+    title3_surface = title_font.render("TO DELETE A PLAYER\n (press X)", True, WHITE, BLACK)
+    list_font = pygame.font.SysFont("inconsolata", 24)
+
+    #Retrieve the list of players from file
+    player_list = get_player_list()
+    list_size = len(player_list)
+    highlight_index = 0 
+
+    #Listen for user input: Select player, Create new player, Delete Player
+    while True:
+        for event in pygame.event.get():
+            if event.type == KEYDOWN: 
+                if event.key == K_RETURN:
+                    player = Player(player_list[highlight_index][0], player_list[highlight_index][1])
+                    display_game_menu(surface, player)
+                elif event.key == K_DOWN:
+                    if not highlight_index == (list_size-1):
+                        highlight_index += 1
+                elif event.key == K_UP:
+                    if not highlight_index == 0:
+                        highlight_index -= 1
+                elif event.key == K_c:
+                    display_create_player_menu(surface)
+                    player_list = get_player_list() 
+                    list_size = len(player_list)
+                    highlight_index = 0
+                elif event.key == K_x:
+                    del player_list[highlight_index]
+                    update_player_list(player_list)
+                    player_list = get_player_list()
+                    list_size = len(player_list)
+                    highlight_index = 0
+
+        surface.fill(BLACK)
+        surface.blit(title1_surface, (SCREEN_SIZE[0]/2 - 400, 200))
+        surface.blit(title2_surface, (SCREEN_SIZE[0]/2 - 400, 250))
+        surface.blit(title3_surface, (SCREEN_SIZE[0]/2 - 400, 300))
+
+        count = 0
+        for name in player_list:
+            if name[0] == player_list[highlight_index][0]:
+                FORE = BLACK
+                BACK = WHITE
+            else:
+                FORE = WHITE
+                BACK = BLACK
+
+            name_surface = list_font.render(name[0], True, FORE, BACK)
+            surface.blit(name_surface, (SCREEN_SIZE[0]/2 - 400, 350 +(count*36)))
+            count += 1
+
+        pygame.display.update()
+
+def display_create_player_menu(surface):
+    surface.fill(BLACK)
+    title_font = pygame.font.SysFont("inconsolata", 32, bold=True)
+    name_font = pygame.font.SysFont("inconsolata", 28)
+    title_text = "Please enter the name of the new player:"
+    title_surface = title_font.render(title_text, True, WHITE, BLACK)
+   
+    pygame.display.update()
+    name_string = ""
+    while True:
+        for event in pygame.event.get():
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    return
+                elif event.key == K_BACKSPACE:
+                    strlen = len(name_string)
+                    name_string = name_string[:(strlen-1)]
+                elif event.key == K_RETURN:
+                    if len(name_string) > 0:
+                        with open("user_data/player_data.csv", "a") as player_data_file:
+                            field_names = ["name", "score"]
+                            writer = csv.DictWriter(player_data_file, fieldnames=field_names)
+                            writer.writerow({"name": name_string, "score": 0})
+                        
+                        return
+                else:
+                    name_string += event.unicode
+
+        surface.fill(BLACK)
+        name_surface = name_font.render(name_string, True, BLACK, WHITE)
+        surface.blit(name_surface, (SCREEN_SIZE[0]/2 - 200, SCREEN_SIZE[1]/2 - 100))
+        surface.blit(title_surface, (SCREEN_SIZE[0]/2 - 200, SCREEN_SIZE[1]/2 - 200))
+        pygame.display.update()
+        
 def display_exit_prompt(surface):
     surface.fill((0, 0, 0, 0.5))
     question = "Are you sure you want to exit?"
@@ -219,43 +353,53 @@ def display_about_menu(surface):
                     about_file.close()
                     return
 
-def display_game_menu(surface):
+def display_game_menu(surface, player):
     running = True
     while running:
         start_game_text = "New Game"
+        change_player_text = "Change Player"
         high_score_text = "High-Score Table"
         about_text = "About"
         text_font = pygame.font.Font("freesansbold.ttf", 24)
         text1_surface = text_font.render(start_game_text, True, WHITE, BLACK)
         text2_surface = text_font.render(high_score_text, True, WHITE, BLACK)
         text3_surface = text_font.render(about_text, True, WHITE, BLACK)
+        text4_surface = text_font.render(change_player_text, True, WHITE, BLACK)
         text1_rectangle = text1_surface.get_rect()
         text2_rectangle = text2_surface.get_rect()
         text3_rectangle = text3_surface.get_rect()
+        text4_rectangle = text4_surface.get_rect()
         text1_rectangle.center = (SCREEN_SIZE[0]/2, SCREEN_SIZE[1]/3)
         text2_rectangle.center = (SCREEN_SIZE[0]/2, SCREEN_SIZE[1]/3 + 32)
         text3_rectangle.center = (SCREEN_SIZE[0]/2, SCREEN_SIZE[1]/3 + 64)
+        text4_rectangle.center = (SCREEN_SIZE[0]/2, SCREEN_SIZE[1]/3 + 96)
         surface.fill(BLACK)
         surface.blit(text1_surface, text1_rectangle)
         surface.blit(text2_surface, text2_rectangle)
         surface.blit(text3_surface, text3_rectangle)
+        surface.blit(text4_surface, text4_rectangle)
 
         for event in pygame.event.get():
             if event.type == KEYDOWN:
                 if event.key == K_n:
                     #Start a game
-                    player = Player("Moses", 0)
                     new_game = Game(player, surface)
                     new_game.play()
                 elif event.key == K_h:
-                    #Display high-score table
-                    print()
+                    display_high_score_table(surface)
                 elif event.key == K_a:
                     display_about_menu(surface)
+                elif event.key == K_c:
+                    running = False 
+                    break
+                    display_player_selection(surface)
                 elif event.key == K_ESCAPE:
                     display_exit_prompt(surface)
 
         pygame.display.update()
+
+def display_high_score_table(surface):
+    pass
 
 def display_game_over_screen(surface):
     surface.fill((0, 0, 0, 0.5))
