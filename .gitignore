@@ -1,2 +1,6 @@
 __pycache__*
 user_data*
+dump.py
+test.py
+*.xcf
+*.jpg
