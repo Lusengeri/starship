@@ -262,8 +262,7 @@ class GameMenuState(GameState):
                     if event.key == K_n:
                         return "game_play"
                     elif event.key == K_h:
-                        #return "high_scores"
-                        return "splash_screen"
+                        return "high_scores"
                     elif event.key == K_a:
                         return "about_menu"
                     elif event.key == K_c:
@@ -271,6 +270,38 @@ class GameMenuState(GameState):
                     elif event.key == K_ESCAPE:
                         return "exit_confirm"
                     
+class HighScoresState(GameState):
+    def __init__(self, name):
+        super().__init__(name)
+
+    def do_actions(self):
+        GameApp.screen.fill(BLACK)
+        #Create the text to display the options available
+        title_font = pygame.font.SysFont("Inconsolata", 32)
+        list_font = pygame.font.SysFont("inconsolata", 24)
+
+        title1_surface = title_font.render("HIGH SCORE TABLE", True, WHITE, BLACK)
+
+        GameApp.screen.blit(title1_surface, (SCREEN_SIZE[0]/2 - 400, 200))
+
+        count = 0
+        for player in GameApp.high_score_list:
+            FORE = BLACK
+            BACK = WHITE
+
+            name_surface = list_font.render(player[0] + " - " + str(player[1]), True, FORE, BACK)
+            GameApp.screen.blit(name_surface, (SCREEN_SIZE[0]/2 - 400, 330 +(count*36)))
+            count += 1
+
+        pygame.display.update()
+
+    def check_conditions(self):
+        while True:
+            for event in pygame.event.get():
+                if event.type == KEYDOWN:
+                    if event.key == K_ESCAPE:
+                        return "game_menu"
+
 class AboutMenuState(GameState):
     def __init__(self, name):
         super().__init__(name)
@@ -398,7 +429,8 @@ class GamePlayState(GameState):
             self.game_state = "running"
             #Start clock
         elif self.game_state == "paused":
-            print('Do Nothing')
+            pass
+            #print('Do Nothing')
             #Resume Clock
 
     def exit_actions(self):
@@ -408,11 +440,12 @@ class GamePlayState(GameState):
 class GameResultState(GameState):
     def __init__(self, name):
         super().__init__(name)
+        self.menu_message = "Game Over!"
 
     def do_actions(self):
         GameApp.screen.fill((0, 0, 0, 0.5))
         title_font = pygame.font.SysFont("inconsolata", 32, bold=True)
-        title_surface = title_font.render("Game Over!", True, WHITE, BLACK)
+        title_surface = title_font.render(self.menu_message, True, WHITE, BLACK)
         title_width, title_height = title_surface.get_size()
         GameApp.screen.blit(title_surface, (SCREEN_SIZE[0]/2 - title_width/2, SCREEN_SIZE[1]/2 - 50))
         text_font = pygame.font.SysFont("inconsolata", 28)
@@ -432,26 +465,15 @@ class GameResultState(GameState):
                         return "game_menu"
 
     def entry_actions(self):
-        pass
-        #Get 'lowest high-score'
-        #if self.score > 'lowest high-score'
-        #   if len('high_score_list') == 10
-        #       drop 'lowest high-score' from 'high_score_list' 
-        #       place self.score in the appropriate position of 'high_score_list'
-        #   else
-        #       place self.score in the appropriate position of 'high_score_list'
-        #   update file storing 'high_score_list'
-
-    def _exit_actions(self):
+        if GameApp.isHighScore():
+            self.menu_message = "High Score!"
+    
+    def exit_actions(self):
         #Save game result to high-score/ personal-best file if required
-        index = 0
-        for player in GameApp.player_list:
-            if player[0] == game_result.name:
-                if game_result.high_score > GameApp.player_list[index][1]:
-                    GameApp.player_list[index][1] = game_result.high_score
-            index += 1
-
-        GameApp.player_list = sync_player_list(GameApp.player_list)
+        GameApp.update_high_scores(Player(GameApp.current_player.name, GameApp.current_score))
+        GameApp.update_player_data(Player(GameApp.current_player.name, GameApp.current_score))
+        if GameApp.current_score > GameApp.current_player.high_score:
+            GameApp.current_player.high_score = GameApp.current_score 
 
 class PauseScreenState(GameState):
     def do_actions(self):
@@ -573,6 +595,8 @@ class GameApp():
         Path(HIGH_SCORE_FILE).touch()
         Path(PLAYER_DATA_FILE).touch()
 
+    @classmethod
+    def run(cls):
         cls.menu_system.process()
 
     @classmethod
@@ -586,7 +610,55 @@ class GameApp():
         cls.menu_system.add_state(GamePlayState("game_play"))
         cls.menu_system.add_state(GameResultState("game_result"))
         cls.menu_system.add_state(PauseScreenState("pause_screen"))
+        cls.menu_system.add_state(HighScoresState("high_scores"))
         cls.menu_system.set_state("splash_screen")
+
+    @classmethod
+    def isHighScore(cls):
+        if len(cls.high_score_list) < 10:
+            return True
+
+        if len(cls.high_score_list) > 0:
+            lowest_high = cls.high_score_list[len(cls.high_score_list) - 1][1]
+            if cls.current_score > lowest_high:
+                return True
+            else:
+                return False 
+        else:
+            return True
+
+    @classmethod
+    def update_high_scores(cls, player):
+        list_length = len(cls.high_score_list)
+        if list_length == 0:
+            cls.high_score_list.append([player.name, player.high_score])
+        elif list_length < 10:
+            for index in range(0, list_length):
+                if cls.high_score_list[index][1] < player.high_score:
+                    cls.high_score_list.insert(index, [player.name, player.high_score])
+                    break
+            else:
+                cls.high_score_list.append([player.name, player.high_score])
+        else:
+            for index in range(0, list_length):
+                if cls.high_score_list[index][1] < player.high_score:
+                    cls.high_score_list.insert(index, [player.name, player.high_score])
+                    break
+
+        while len(cls.high_score_list) > 10:
+            cls.high_score_list.pop()
+
+        cls.high_score_list = sync_high_score_list(cls.high_score_list)
+    
+    @classmethod
+    def update_player_data(cls, player):
+        for pl in cls.player_list:
+            if pl[0] == player.name:
+                if pl[1] < player.high_score:
+                    pl[1] = player.high_score
+
+        cls.player_list = sync_player_list(cls.player_list)
 
 if __name__ == "__main__":
     GameApp.initialize()
+    GameApp.run()
