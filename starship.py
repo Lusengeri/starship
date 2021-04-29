@@ -362,7 +362,7 @@ class ExitConfirmState(GameState):
 class GamePlayState(GameState):
     def __init__(self, name):
         super().__init__(name)
-        self.game_state = "not_running"
+        #self.game_state = "not_running"
         self.reset_game()
 
     def reset_game(self):
@@ -405,7 +405,7 @@ class GamePlayState(GameState):
             for event in pygame.event.get():
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:
-                        self.game_state = "paused"
+                        GameApp.game_state = "paused"
                         return "pause_screen"
 
             time_passed = self.clock.tick()/1000.0
@@ -418,20 +418,19 @@ class GamePlayState(GameState):
                 if self.starship.rect.colliderect(asset.rect):
                     ##if self.player.high_score < self.score:
                         ##self.player.high_score = self.score
-                    self.game_state = "not_running"
+                    GameApp.game_state = "not_running"
                     return "game_result"
         return None
 
     def entry_actions(self):
         #Show countdown timer to start the spaceship
-        if self.game_state == "not_running":
+        if GameApp.game_state == "not_running":
             self.reset_game()
-            self.game_state = "running"
+            GameApp.game_state = "running"
             #Start clock
-        elif self.game_state == "paused":
-            pass
-            #print('Do Nothing')
-            #Resume Clock
+        elif GameApp.game_state == "paused":
+            #Reset clocking
+            self.clock.tick()
 
     def exit_actions(self):
         pass
@@ -479,22 +478,29 @@ class PauseScreenState(GameState):
     def do_actions(self):
         symbol = "||"
         text = "PAUSED"
+        quit_option = "Quit"
+        resume_option = "Resume"
         font = pygame.font.SysFont("inconsolata", 64)
         symbol_surface = font.render(symbol, True, WHITE, BLACK)
         text_surface = font.render(text, True, WHITE, BLACK)
+        quit_surface = font.render(quit_option, True, WHITE, BLACK)
+        resume_surface = font.render(resume_option, True, WHITE, BLACK)
         GameApp.screen.blit(symbol_surface, (SCREEN_SIZE[0]/2-25, SCREEN_SIZE[1]/2-100))
         GameApp.screen.blit(text_surface, (SCREEN_SIZE[0]/2-65, SCREEN_SIZE[1]/2))
+        GameApp.screen.blit(quit_surface, (SCREEN_SIZE[0]/2-150, SCREEN_SIZE[1]/2+50))
+        GameApp.screen.blit(resume_surface, (SCREEN_SIZE[0]/2+65, SCREEN_SIZE[1]/2+50))
         pygame.display.update()
 
     def check_conditions(self):
         while True:
             for event in pygame.event.get():
                 if event.type == KEYDOWN:
-                    if event.key == K_ESCAPE:
+                    if event.key == K_ESCAPE or event.key == K_r:
                         return "game_play"
-                    #Provide facility for quiting game
-                    #elif event.key == K_RETURN:
-                        #return
+                    elif event.key == K_q:
+                        GameApp.game_state = "not_running"
+                        return "game_menu"
+                        
             return None
 
 class GameAsset(object):
@@ -575,6 +581,7 @@ class GameApp():
     current_player = None 
     high_score_list = None 
     menu_system = None
+    game_state = "not_running"
 
     @classmethod
     def initialize(cls):
@@ -582,7 +589,7 @@ class GameApp():
         pygame.init()
         pygame.mouse.set_visible(False)
         cls.screen = pygame.display.set_mode(SCREEN_SIZE, FULLSCREEN, 32)
-        cls.player_list = sync_player_list() 
+        cls.player_list = sync_player_list()
         cls.current_player = Player("default_player", 0) 
         cls.high_score_list = sync_high_score_list()
         cls.menu_system = MenuStateMachine()
