@@ -1,4 +1,5 @@
 import pygame
+import pygame_gui
 from pygame.locals import *
 from vector2 import Vector2
 from random import randint
@@ -14,7 +15,7 @@ SPACECRAFT_SPEED = 400
 
 INTRO_SCREEN_FILE = "images/SplashScreenImage.png"
 PLAYER_DATA_FILE = "user_data/player_data.csv"
-HIGH_SCORE_FILE = "user_data/high_scores.csv" 
+HIGH_SCORE_FILE = "user_data/high_scores.csv"
 ABOUT_FILE = "README.md"
 
 class MenuStateMachine(object):
@@ -22,7 +23,7 @@ class MenuStateMachine(object):
         self.states =  {}
         self.active_state = None
     
-    def add_state(self, state): 
+    def add_state(self, state):
         self.states[state.name] = state
 
     def process(self):
@@ -81,6 +82,7 @@ class Player(object):
 class GameState(object):
     def __init__(self, name):
         self.name = name
+        self.gui_manager = pygame_gui.UIManager(SCREEN_SIZE)
 
     def do_actions(self):
         pass
@@ -94,8 +96,9 @@ class GameState(object):
     def exit_actions(self):
         pass
 
-class SplashScreenState(GameState):
-    def do_actions(self): 
+class SplashScreenMenu(GameState):
+    def do_actions(self):
+        super().do_actions()
         GameApp.screen.fill(BLACK)
         intro_screen_image = pygame.image.load(INTRO_SCREEN_FILE).convert_alpha()
         i_w, i_h = intro_screen_image.get_size()
@@ -104,87 +107,111 @@ class SplashScreenState(GameState):
         time.sleep(3)
 
     def check_conditions(self):
-        return "choose_player"
+        return "select_player"
 
-class ChoosePlayerState(GameState):
+    def entry_actions(self):
+        pygame.mouse.set_visible(False)
+
+    def exit_actions(self):
+        pygame.mouse.set_visible(True)
+
+
+class SelectPlayerMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
-        self.list_size = len(GameApp.player_list)
-        self.highlight_index = 0
+        self.time_delta = 0.0
+        self.internal_clock = pygame.time.Clock()
+        self.initialize_gui_elements()
+
+    def initialize_gui_elements(self):
+        pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((384, 100), (600, 40)), text="SELECT A PLAYER", manager=self.gui_manager )
+        pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((384, 150), (600, 40)), text="TO CREATE A NEW PLAYER PRESS 'C'", manager=self.gui_manager )
+        pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((384, 200), (600, 40)), text="TO DELETE A PLAYER PRESS 'X'", manager=self.gui_manager)
+
+        my_list = []
+        for item in GameApp.player_list:
+            my_list.append(item[0])
+            
+        self.selection_list = pygame_gui.elements.ui_selection_list.UISelectionList(relative_rect= pygame.Rect((384,250), (600,300)), item_list= my_list, manager= self.gui_manager)
+
+        self.delete_player_button = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((384, 550), (175, 40)), text="DELETE", manager=self.gui_manager)
+        self.create_player_button = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((598, 550), (175, 40)), text="CREATE NEW", manager=self.gui_manager)
+        self.continue_button = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((810, 550), (174, 40)), text="CONTINUE", manager=self.gui_manager)
+
+    def refresh_gui_elements(self):
+        my_list = []
+        for item in GameApp.player_list:
+            my_list.append(item[0])
+
+        self.selection_list.set_item_list(my_list)
 
     def do_actions(self):
+        if self.selection_list.get_single_selection() == None:
+            self.delete_player_button.disable()
+            self.continue_button.disable()
+        else:
+            self.delete_player_button.enable()
+            self.continue_button.enable()
+    
         GameApp.screen.fill(BLACK)
-        #Create the text to display the options available
-        title_font = pygame.font.SysFont("Inconsolata", 32)
-        list_font = pygame.font.SysFont("inconsolata", 24)
-
-        title1_surface = title_font.render("SELECT A PLAYER", True, WHITE, BLACK)
-        title2_surface = title_font.render("TO CREATE A NEW PLAYER\n (press C)", True, WHITE, BLACK)
-        title3_surface = title_font.render("TO DELETE A PLAYER\n (press X)", True, WHITE, BLACK)
-
-        #Retrieve the list of players from file
-        self.list_size = len(GameApp.player_list)
-
-        GameApp.screen.fill(BLACK)
-        GameApp.screen.blit(title1_surface, (SCREEN_SIZE[0]/2 - 400, 200))
-        GameApp.screen.blit(title2_surface, (SCREEN_SIZE[0]/2 - 400, 250))
-        GameApp.screen.blit(title3_surface, (SCREEN_SIZE[0]/2 - 400, 300))
-
-        count = 0
-        for player in GameApp.player_list:
-            if player[0] == GameApp.player_list[self.highlight_index][0]:
-                FORE = BLACK
-                BACK = WHITE
-            else:
-                FORE = WHITE
-                BACK = BLACK
-
-            name_surface = list_font.render(player[0], True, FORE, BACK)
-            GameApp.screen.blit(name_surface, (SCREEN_SIZE[0]/2 - 400, 350 +(count*36)))
-            count += 1
-
+        self.time_delta = GameApp.game_clock.tick(60)/1000.0
+        self.gui_manager.update(self.time_delta)
+        self.gui_manager.draw_ui(GameApp.screen)
         pygame.display.update()
 
     def check_conditions(self):
-        while True:
-            for event in pygame.event.get():
-                if event.type == KEYDOWN: 
-                    if event.key == K_RETURN:
-                        if self.list_size > 0:
-                            GameApp.current_player.name = GameApp.player_list[self.highlight_index][0]
-                            GameApp.current_player.high_score = int(GameApp.player_list[self.highlight_index][1])
-                            return "game_menu"
-                    elif event.key == K_DOWN:
-                        if not self.highlight_index == (self.list_size-1):
-                            self.highlight_index += 1
+        for event in pygame.event.get():
+            self.gui_manager.process_events(event)
+            if event.type == KEYDOWN:
+                if event.key == K_RETURN:
+                    GameApp.current_player.name = self.selection_list.get_single_selection()
+                    GameApp.current_player.high_score =  int([player[1] for player in GameApp.player_list if player[0] == GameApp.current_player.name][0])
+                    return "game_menu"
+                elif event.key == K_DOWN:
+                    #Keyboard navigation desirable for selection-list
+                    return None
+                elif event.key == K_UP:
+                    #Keyboard navigation desirable for selection-list
+                    return None
+                elif event.key == K_c:
+                    return "create_player"
+                elif event.key == K_x:
+                    if len(GameApp.player_list) > 0:
+                        [GameApp.player_list.remove(player) for player in GameApp.player_list if player[0] == self.selection_list.get_single_selection()]
+                        GameApp.player_list = sync_player_list(GameApp.player_list)
+                        self.refresh_gui_elements()
                         return None
-                    elif event.key == K_UP:
-                        if not self.highlight_index == 0:
-                            self.highlight_index -= 1
-                        return None
-                    elif event.key == K_c:
-                        return "create_player"
-                    elif event.key == K_x:
+
+            if event.type == pygame.USEREVENT:
+                if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                    if event.ui_element == self.continue_button:
+                        GameApp.current_player.name = self.selection_list.get_single_selection()
+                        GameApp.current_player.high_score =  int([player[1] for player in GameApp.player_list if player[0] == GameApp.current_player.name][0])
+                        return "game_menu"
+                    elif event.ui_element == self.delete_player_button:
                         if len(GameApp.player_list) > 0:
-                            GameApp.player_list.pop(self.highlight_index)
+                            [GameApp.player_list.remove(player) for player in GameApp.player_list if player[0] == self.selection_list.get_single_selection()]
                             GameApp.player_list = sync_player_list(GameApp.player_list)
-                            self.list_size = len(GameApp.player_list)
-                            self.highlight_index = 0
+                            self.refresh_gui_elements()
                             return None
+                    elif event.ui_element == self.create_player_button:
+                        return "create_player"
 
     def entry_actions(self):
         GameApp.player_list = sync_player_list()
-        self.list_size = len(GameApp.player_list)
         self.highlight_index = 0
+        self.refresh_gui_elements()
 
-class CreatePlayerState(GameState):
+class CreatePlayerMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
         self.name_string = ""
+        #self.button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((350, 150), (100, 50)), text="New Button", manager=GameApp.manager)
+        self.internal_clock = pygame.time.Clock()
  
     def do_actions(self):
+        super().do_actions()
         GameApp.screen.fill(BLACK)
-
         title_font = pygame.font.SysFont("inconsolata", 32, bold=True)
         name_font = pygame.font.SysFont("inconsolata", 28)
         title_text = "Please enter the name of the new player:"
@@ -196,26 +223,31 @@ class CreatePlayerState(GameState):
         pygame.display.update()
 
     def check_conditions(self):
-        while True:
-            for event in pygame.event.get():
-                if event.type == KEYDOWN:
-                    if event.key == K_ESCAPE:
-                        return "choose_player"
-                    elif event.key == K_BACKSPACE:
-                        strlen = len(self.name_string)
-                        self.name_string = self.name_string[:(strlen-1)]
-                        return None
-                    elif event.key == K_RETURN:
-                        if len(self.name_string) > 0:
-                            with open(PLAYER_DATA_FILE, "a") as player_data_file:
-                                field_names = ["name", "score"]
-                                writer = csv.DictWriter(player_data_file, fieldnames=field_names)
-                                writer.writerow({"name": self.name_string, "score": 0})
-         
-                            return "choose_player"
-                    else:
-                        self.name_string += event.unicode
-                        return None
+        time_delta = self.internal_clock.tick(60)/1000.0
+        for event in pygame.event.get():
+            GameApp.gui_manager.process_events(event)
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    return "select_player"
+                elif event.key == K_BACKSPACE:
+                    strlen = len(self.name_string)
+                    self.name_string = self.name_string[:(strlen-1)]
+                    return None
+                elif event.key == K_RETURN:
+                    if len(self.name_string) > 0:
+                        with open(PLAYER_DATA_FILE, "a") as player_data_file:
+                            field_names = ["name", "score"]
+                            writer = csv.DictWriter(player_data_file, fieldnames=field_names)
+                            writer.writerow({"name": self.name_string, "score": 0})
+     
+                        return "select_player"
+                else:
+                    self.name_string += event.unicode
+                    return None
+
+        GameApp.gui_manager.update(time_delta)
+        GameApp.gui_manager.draw_ui(GameApp.screen)
+        pygame.display.update()
 
     def entry_actions(self):
         self.name_string = ""
@@ -223,7 +255,7 @@ class CreatePlayerState(GameState):
     def exit_actions(self):
         GameApp.player_list = sync_player_list() 
 
-class GameMenuState(GameState):
+class MainMenu(GameState):
     def do_actions(self):
         start_game_text = "New Game"
         change_player_text = "Change Player"
@@ -256,7 +288,8 @@ class GameMenuState(GameState):
         pygame.display.update()
 
     def check_conditions(self):
-        while 1 :
+        while True:
+            self.time_delta = GameApp.game_clock.tick(60)/1000.0
             for event in pygame.event.get():
                 if event.type == KEYDOWN:
                     if event.key == K_n:
@@ -264,13 +297,13 @@ class GameMenuState(GameState):
                     elif event.key == K_h:
                         return "high_scores"
                     elif event.key == K_a:
-                        return "about_menu"
+                        return "about"
                     elif event.key == K_c:
-                        return "choose_player"
+                        return "select_player"
                     elif event.key == K_ESCAPE:
                         return "exit_confirm"
                     
-class HighScoresState(GameState):
+class HighScoresMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
 
@@ -297,15 +330,15 @@ class HighScoresState(GameState):
 
     def check_conditions(self):
         while True:
+            self.time_delta = GameApp.game_clock.tick(60)/1000.0
             for event in pygame.event.get():
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:
                         return "game_menu"
 
-class AboutMenuState(GameState):
+class AboutMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
-        self.about_file = open(ABOUT_FILE, "r", 1)
 
     def do_actions(self):
         GameApp.screen.fill((0, 0, 0, 0.5))
@@ -315,15 +348,18 @@ class AboutMenuState(GameState):
         GameApp.screen.blit(title_surface, (SCREEN_SIZE[0]/2 - title_width/2, SCREEN_SIZE[1]/2 - 50))
         text_font = pygame.font.SysFont("inconsolata", 16)
 
+        line_pos = 0
         for line in self.about_file:
             text_surface = text_font.render(line, True, WHITE, BLACK)
             text_width, text_height = text_surface.get_size()
-            GameApp.screen.blit(text_surface, (40, SCREEN_SIZE[1]/2))
+            GameApp.screen.blit(text_surface, (270, (SCREEN_SIZE[1]/2)+line_pos))
+            line_pos +=15
 
         pygame.display.update()
 
     def check_conditions(self):
         while True:
+            self.time_delta = GameApp.game_clock.tick(60)/1000.0
             for event in pygame.event.get():
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:
@@ -335,7 +371,7 @@ class AboutMenuState(GameState):
     def exit_actions(self):
         self.about_file.close()
 
-class ExitConfirmState(GameState):
+class ExitConfirmMenu(GameState):
     def do_actions(self):
         GameApp.screen.fill((0, 0, 0, 0.5))
         question = "Are you sure you want to exit?"
@@ -351,6 +387,7 @@ class ExitConfirmState(GameState):
         
     def check_conditions(self):
         while True:
+            self.time_delta = GameApp.game_clock.tick(60)/1000.0
             for event in pygame.event.get():
                 if event.type == KEYDOWN:
                     if event.key == K_y:
@@ -359,7 +396,7 @@ class ExitConfirmState(GameState):
                     elif event.key == K_n:
                         return "game_menu"
 
-class GamePlayState(GameState):
+class GamePlayMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
         #self.game_state = "not_running"
@@ -381,6 +418,7 @@ class GamePlayState(GameState):
         self.clock = pygame.time.Clock()
 
     def do_actions(self):
+        #super().do_actions()
         #Draw all game artifacts here
         GameApp.screen.fill(BLACK)
         for asset in self.game_objects:
@@ -401,15 +439,14 @@ class GamePlayState(GameState):
         GameApp.screen.blit(player_surface, (0, 40))
 
     def check_conditions(self):
-        while True:
-            for event in pygame.event.get():
-                if event.type == KEYDOWN:
-                    if event.key == K_ESCAPE:
-                        GameApp.game_state = "paused"
-                        return "pause_screen"
+        for event in pygame.event.get():
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    GameApp.game_state = "paused"
+                    return "pause_screen"
 
-            time_passed = self.clock.tick()/1000.0
-            return self.update(time_passed)
+        time_passed = self.clock.tick()/1000.0
+        return self.update(time_passed)
 
     def update(self, time_passed):
         for asset in self.game_objects:
@@ -423,6 +460,7 @@ class GamePlayState(GameState):
         return None
 
     def entry_actions(self):
+        pygame.mouse.set_visible(False)
         #Show countdown timer to start the spaceship
         if GameApp.game_state == "not_running":
             self.reset_game()
@@ -433,10 +471,9 @@ class GamePlayState(GameState):
             self.clock.tick()
 
     def exit_actions(self):
-        pass
-        #Pause Clock
+        pygame.mouse.set_visible(True)
         
-class GameResultState(GameState):
+class GameResultMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
         self.menu_message = "Game Over!"
@@ -458,6 +495,7 @@ class GameResultState(GameState):
 
     def check_conditions(self):
         while True:
+            self.time_delta = GameApp.game_clock.tick(60)/1000.0
             for event in pygame.event.get():
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:
@@ -474,7 +512,7 @@ class GameResultState(GameState):
         if GameApp.current_score > GameApp.current_player.high_score:
             GameApp.current_player.high_score = GameApp.current_score 
 
-class PauseScreenState(GameState):
+class PauseScreenMenu(GameState):
     def do_actions(self):
         symbol = "||"
         text = "PAUSED"
@@ -493,6 +531,7 @@ class PauseScreenState(GameState):
 
     def check_conditions(self):
         while True:
+            self.time_delta = GameApp.game_clock.tick(60)/1000.0
             for event in pygame.event.get():
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE or event.key == K_r:
@@ -582,15 +621,18 @@ class GameApp():
     high_score_list = None 
     menu_system = None
     game_state = "not_running"
+    game_clock = None
+    gui_manager = None
 
     @classmethod
     def initialize(cls):
         cls.current_score = 0
         pygame.init()
-        pygame.mouse.set_visible(False)
         cls.screen = pygame.display.set_mode(SCREEN_SIZE, FULLSCREEN, 32)
+        cls.gui_manager = pygame_gui.UIManager(SCREEN_SIZE)
+        cls.game_clock = pygame.time.Clock()
         cls.player_list = sync_player_list()
-        cls.current_player = Player("default_player", 0) 
+        cls.current_player = Player("default_player", 0)
         cls.high_score_list = sync_high_score_list()
         cls.menu_system = MenuStateMachine()
         cls.create_menus()
@@ -608,16 +650,16 @@ class GameApp():
 
     @classmethod
     def create_menus(cls):
-        cls.menu_system.add_state(SplashScreenState("splash_screen"))
-        cls.menu_system.add_state(ChoosePlayerState("choose_player"))
-        cls.menu_system.add_state(GameMenuState("game_menu"))
-        cls.menu_system.add_state(ExitConfirmState("exit_confirm"))
-        cls.menu_system.add_state(CreatePlayerState("create_player"))
-        cls.menu_system.add_state(AboutMenuState("about_menu"))
-        cls.menu_system.add_state(GamePlayState("game_play"))
-        cls.menu_system.add_state(GameResultState("game_result"))
-        cls.menu_system.add_state(PauseScreenState("pause_screen"))
-        cls.menu_system.add_state(HighScoresState("high_scores"))
+        cls.menu_system.add_state(SplashScreenMenu("splash_screen"))
+        cls.menu_system.add_state(SelectPlayerMenu("select_player"))
+        cls.menu_system.add_state(MainMenu("game_menu"))
+        cls.menu_system.add_state(ExitConfirmMenu("exit_confirm"))
+        cls.menu_system.add_state(CreatePlayerMenu("create_player"))
+        cls.menu_system.add_state(AboutMenu("about"))
+        cls.menu_system.add_state(GamePlayMenu("game_play"))
+        cls.menu_system.add_state(GameResultMenu("game_result"))
+        cls.menu_system.add_state(PauseScreenMenu("pause_screen"))
+        cls.menu_system.add_state(HighScoresMenu("high_scores"))
         cls.menu_system.set_state("splash_screen")
 
     @classmethod
