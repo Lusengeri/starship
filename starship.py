@@ -363,37 +363,39 @@ class HighScoresMenu(GameState):
 class AboutMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
+        self.time_delta = 0.0
+        self.internal_clock = pygame.time.Clock()
+        self.initialize_gui_elements()
+
+    def initialize_gui_elements(self):
+        self.title_label = pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((383, 160), (600, 40)), text="ABOUT STARSHIP ODYSSEY", manager=self.gui_manager)
+        about_file = open(ABOUT_FILE, "r", 1)
+        string = ""
+        for line in about_file:
+            string += line
+
+        about_file.close()
+            
+        self.about_text = pygame_gui.elements.ui_text_box.UITextBox(relative_rect=pygame.Rect((383, 210), (600, 300)), manager=self.gui_manager, html_text=string)
+        self.back_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((383, 550), (175, 40)), text="BACK", manager=self.gui_manager)
 
     def do_actions(self):
-        GameApp.screen.fill((0, 0, 0, 0.5))
-        title_font = pygame.font.SysFont("inconsolata", 32, bold=True)
-        title_surface = title_font.render("About Starship Odyssey", True, WHITE, BLACK)
-        title_width, title_height = title_surface.get_size()
-        GameApp.screen.blit(title_surface, (SCREEN_SIZE[0]/2 - title_width/2, SCREEN_SIZE[1]/2 - 50))
-        text_font = pygame.font.SysFont("inconsolata", 16)
-
-        line_pos = 0
-        for line in self.about_file:
-            text_surface = text_font.render(line, True, WHITE, BLACK)
-            text_width, text_height = text_surface.get_size()
-            GameApp.screen.blit(text_surface, (270, (SCREEN_SIZE[1]/2)+line_pos))
-            line_pos +=15
-
+        self.time_delta = self.internal_clock.tick(60)/1000.0
+        GameApp.screen.fill(BLACK)
+        self.gui_manager.update(self.time_delta)
+        self.gui_manager.draw_ui(GameApp.screen)
         pygame.display.update()
 
     def check_conditions(self):
-        while True:
-            self.time_delta = GameApp.game_clock.tick(60)/1000.0
-            for event in pygame.event.get():
-                if event.type == KEYDOWN:
-                    if event.key == K_ESCAPE:
+        for event in pygame.event.get():
+            self.gui_manager.process_events(event)
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    return "main_menu"
+            elif event.type == pygame.USEREVENT:
+                if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                    if event.ui_element == self.back_btn:
                         return "main_menu"
-
-    def entry_actions(self):
-        self.about_file = open(ABOUT_FILE, "r", 1)
-
-    def exit_actions(self):
-        self.about_file.close()
 
 class ExitConfirmMenu(GameState):
     def __init__(self, name):
@@ -409,17 +411,6 @@ class ExitConfirmMenu(GameState):
         self.confirm_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((700, 350), (175, 40)), text="YES", manager=self.gui_manager)
 
     def do_actions(self):
-        #GameApp.screen.fill((0, 0, 0, 0.5))
-        #question = "Are you sure you want to exit?"
-        #options = "Yes / No"
-        #question_font = pygame.font.SysFont("inconsolata", 32)
-        #options_font = pygame.font.SysFont("inconsolata", 24)
-        #question_surface = question_font.render(question, True, WHITE, BLACK)
-        #options_surface = options_font.render(options, True, WHITE, BLACK)
-        #q_w, q_h = question_surface.get_size()
-        #GameApp.screen.blit(question_surface, (SCREEN_SIZE[0]/2 - q_w/2,  SCREEN_SIZE[1]/2))
-        #GameApp.screen.blit(options_surface, (SCREEN_SIZE[0]/2 - q_w/2 + 120,  SCREEN_SIZE[1]/2 + 40))
-
         self.time_delta = self.internal_clock.tick(60)/1000.0
         GameApp.screen.fill(BLACK)
         self.gui_manager.update(self.time_delta)
