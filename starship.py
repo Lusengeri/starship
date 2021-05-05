@@ -396,29 +396,52 @@ class AboutMenu(GameState):
         self.about_file.close()
 
 class ExitConfirmMenu(GameState):
+    def __init__(self, name):
+        super().__init__(name)
+        self.time_delta = 0.0
+        self.internal_clock = pygame.time.Clock()
+        self.initialize_gui_elements()
+
+    def initialize_gui_elements(self):
+        self.menu_title = pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((383, 160), (600, 40)), text="EXIT GAME", manager=self.gui_manager)
+        self.question_label = pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((383, 250), (600, 40)), text="Are you sure you want to exit the game?", manager=self.gui_manager)
+        self.back_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((480, 350), (175, 40)), text="NO", manager=self.gui_manager)
+        self.confirm_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((700, 350), (175, 40)), text="YES", manager=self.gui_manager)
+
     def do_actions(self):
-        GameApp.screen.fill((0, 0, 0, 0.5))
-        question = "Are you sure you want to exit?"
-        options = "Yes / No"
-        question_font = pygame.font.SysFont("inconsolata", 32)
-        options_font = pygame.font.SysFont("inconsolata", 24)
-        question_surface = question_font.render(question, True, WHITE, BLACK)
-        options_surface = options_font.render(options, True, WHITE, BLACK)
-        q_w, q_h = question_surface.get_size()
-        GameApp.screen.blit(question_surface, (SCREEN_SIZE[0]/2 - q_w/2,  SCREEN_SIZE[1]/2))
-        GameApp.screen.blit(options_surface, (SCREEN_SIZE[0]/2 - q_w/2 + 120,  SCREEN_SIZE[1]/2 + 40))
+        #GameApp.screen.fill((0, 0, 0, 0.5))
+        #question = "Are you sure you want to exit?"
+        #options = "Yes / No"
+        #question_font = pygame.font.SysFont("inconsolata", 32)
+        #options_font = pygame.font.SysFont("inconsolata", 24)
+        #question_surface = question_font.render(question, True, WHITE, BLACK)
+        #options_surface = options_font.render(options, True, WHITE, BLACK)
+        #q_w, q_h = question_surface.get_size()
+        #GameApp.screen.blit(question_surface, (SCREEN_SIZE[0]/2 - q_w/2,  SCREEN_SIZE[1]/2))
+        #GameApp.screen.blit(options_surface, (SCREEN_SIZE[0]/2 - q_w/2 + 120,  SCREEN_SIZE[1]/2 + 40))
+
+        self.time_delta = self.internal_clock.tick(60)/1000.0
+        GameApp.screen.fill(BLACK)
+        self.gui_manager.update(self.time_delta)
+        self.gui_manager.draw_ui(GameApp.screen)
         pygame.display.update()
         
     def check_conditions(self):
-        while True:
-            self.time_delta = GameApp.game_clock.tick(60)/1000.0
-            for event in pygame.event.get():
-                if event.type == KEYDOWN:
-                    if event.key == K_y:
+        for event in pygame.event.get():
+            self.gui_manager.process_events(event)
+            if event.type == KEYDOWN:
+                if event.key == K_y:
+                    pygame.quit()
+                    exit()
+                elif event.key == K_n:
+                    return "main_menu"
+            elif event.type == pygame.USEREVENT:
+                if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                    if event.ui_element == self.back_btn:
+                        return "main_menu"
+                    elif event.ui_element == self.confirm_btn:
                         pygame.quit()
                         exit()
-                    elif event.key == K_n:
-                        return "main_menu"
 
 class GamePlayMenu(GameState):
     def __init__(self, name):
