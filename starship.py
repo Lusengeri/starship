@@ -266,53 +266,53 @@ class CreatePlayerMenu(GameState):
         GameApp.player_list = sync_player_list()
 
 class MainMenu(GameState):
+    def __init__(self, name):
+        super().__init__(name)
+        self.time_delta = 0.0
+        self.internal_clock = pygame.time.Clock()
+        self.initialize_gui_elements()
+
+    def initialize_gui_elements(self):
+        self.new_game_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((383, 160), (600, 40)), text="NEW GAME", manager=self.gui_manager)
+        self.change_plyr_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((383, 210), (600, 40)), text="CHANGE PLAYER", manager=self.gui_manager)
+        self.hi_scores_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((383, 260), (600, 40)), text="HIGH SCORES", manager=self.gui_manager)
+        self.about_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((383, 310), (600, 40)), text="ABOUT", manager=self.gui_manager)
+        self.exit_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((383, 360), (600, 40)), text="EXIT", manager=self.gui_manager)
+
     def do_actions(self):
-        start_game_text = "New Game"
-        change_player_text = "Change Player"
-        high_score_text = "High-Score Table"
-        about_text = "About"
-
-        text_font = pygame.font.Font("freesansbold.ttf", 24)
-
-        text1_surface = text_font.render(start_game_text, True, WHITE, BLACK)
-        text2_surface = text_font.render(about_text, True, WHITE, BLACK)
-        text3_surface = text_font.render(high_score_text, True, WHITE, BLACK)
-        text4_surface = text_font.render(change_player_text, True, WHITE, BLACK)
-        
-        text1_rectangle = text1_surface.get_rect()
-        text2_rectangle = text2_surface.get_rect()
-        text3_rectangle = text3_surface.get_rect()
-        text4_rectangle = text4_surface.get_rect()
-        
-        text1_rectangle.center = (SCREEN_SIZE[0]/2, SCREEN_SIZE[1]/3)
-        text2_rectangle.center = (SCREEN_SIZE[0]/2, SCREEN_SIZE[1]/3 + 32)
-        text3_rectangle.center = (SCREEN_SIZE[0]/2, SCREEN_SIZE[1]/3 + 64)
-        text4_rectangle.center = (SCREEN_SIZE[0]/2, SCREEN_SIZE[1]/3 + 96)
-
+        self.time_delta = GameApp.game_clock.tick(60)/1000.0
         GameApp.screen.fill(BLACK)
-        GameApp.screen.blit(text1_surface, text1_rectangle)
-        GameApp.screen.blit(text2_surface, text2_rectangle)
-        GameApp.screen.blit(text3_surface, text3_rectangle)
-        GameApp.screen.blit(text4_surface, text4_rectangle)
-
+        self.gui_manager.update(self.time_delta)
+        self.gui_manager.draw_ui(GameApp.screen)
         pygame.display.update()
 
     def check_conditions(self):
-        while True:
-            self.time_delta = GameApp.game_clock.tick(60)/1000.0
-            for event in pygame.event.get():
-                if event.type == KEYDOWN:
-                    if event.key == K_n:
+        for event in pygame.event.get():
+            self.gui_manager.process_events(event)
+            if event.type == KEYDOWN:
+                if event.key == K_n:
+                    return "game_play"
+                elif event.key == K_h:
+                    return "high_scores"
+                elif event.key == K_a:
+                    return "about"
+                elif event.key == K_c:
+                    return "select_player"
+                elif event.key == K_ESCAPE:
+                    return "exit_confirm"
+            elif event.type == pygame.USEREVENT:
+                if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                    if event.ui_element == self.new_game_btn:
                         return "game_play"
-                    elif event.key == K_h:
-                        return "high_scores"
-                    elif event.key == K_a:
-                        return "about"
-                    elif event.key == K_c:
+                    elif event.ui_element == self.change_plyr_btn:
                         return "select_player"
-                    elif event.key == K_ESCAPE:
+                    elif event.ui_element == self.hi_scores_btn:
+                        return "high_scores"
+                    elif event.ui_element == self.about_btn:
+                        return "about"
+                    elif event.ui_element == self.exit_btn:
                         return "exit_confirm"
-                    
+
 class HighScoresMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
