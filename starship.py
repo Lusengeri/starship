@@ -166,7 +166,7 @@ class SelectPlayerMenu(GameState):
                 if event.key == K_RETURN:
                     GameApp.current_player.name = self.selection_list.get_single_selection()
                     GameApp.current_player.high_score =  int([player[1] for player in GameApp.player_list if player[0] == GameApp.current_player.name][0])
-                    return "game_menu"
+                    return "main_menu"
                 elif event.key == K_DOWN:
                     #Keyboard navigation desirable for selection-list
                     return None
@@ -187,7 +187,7 @@ class SelectPlayerMenu(GameState):
                     if event.ui_element == self.continue_button:
                         GameApp.current_player.name = self.selection_list.get_single_selection()
                         GameApp.current_player.high_score =  int([player[1] for player in GameApp.player_list if player[0] == GameApp.current_player.name][0])
-                        return "game_menu"
+                        return "main_menu"
                     elif event.ui_element == self.delete_player_button:
                         if len(GameApp.player_list) > 0:
                             [GameApp.player_list.remove(player) for player in GameApp.player_list if player[0] == self.selection_list.get_single_selection()]
@@ -316,16 +316,24 @@ class MainMenu(GameState):
 class HighScoresMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
+        self.time_delta = 0.0
+        self.internal_clock = pygame.time.Clock()
+        self.initialize_gui_elements()
+
+    def initialize_gui_elements(self):
+        self.title_label = pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((383, 160), (600, 40)), text="HIGH SCORES", manager=self.gui_manager)
+        self.back_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((383, 550), (175, 40)), text="BACK", manager=self.gui_manager)
 
     def do_actions(self):
+        self.time_delta = self.internal_clock.tick(60)/1000.0
         GameApp.screen.fill(BLACK)
         #Create the text to display the options available
-        title_font = pygame.font.SysFont("Inconsolata", 32)
-        list_font = pygame.font.SysFont("inconsolata", 24)
+        #title_font = pygame.font.SysFont("Inconsolata", 32)
+        list_font = pygame.font.SysFont("inconsolata", 20)
 
-        title1_surface = title_font.render("HIGH SCORE TABLE", True, WHITE, BLACK)
+        #title1_surface = title_font.render("HIGH SCORE TABLE", True, WHITE, BLACK)
 
-        GameApp.screen.blit(title1_surface, (SCREEN_SIZE[0]/2 - 400, 200))
+        #GameApp.screen.blit(title1_surface, (SCREEN_SIZE[0]/2 - 400, 200))
 
         count = 0
         for player in GameApp.high_score_list:
@@ -333,18 +341,24 @@ class HighScoresMenu(GameState):
             BACK = WHITE
 
             name_surface = list_font.render(player[0] + " - " + str(player[1]), True, FORE, BACK)
-            GameApp.screen.blit(name_surface, (SCREEN_SIZE[0]/2 - 400, 330 +(count*36)))
+            GameApp.screen.blit(name_surface, (SCREEN_SIZE[0]/2 - 300, 230 +(count*30)))
             count += 1
 
+        self.gui_manager.update(self.time_delta)
+        self.gui_manager.draw_ui(GameApp.screen)
         pygame.display.update()
 
     def check_conditions(self):
-        while True:
-            self.time_delta = GameApp.game_clock.tick(60)/1000.0
-            for event in pygame.event.get():
-                if event.type == KEYDOWN:
-                    if event.key == K_ESCAPE:
-                        return "game_menu"
+        self.time_delta = GameApp.game_clock.tick(60)/1000.0
+        for event in pygame.event.get():
+            self.gui_manager.process_events(event)
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE:
+                    return "main_menu"
+            elif event.type == pygame.USEREVENT:
+                if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                    if event.ui_element == self.back_btn:
+                        return "main_menu"
 
 class AboutMenu(GameState):
     def __init__(self, name):
@@ -373,7 +387,7 @@ class AboutMenu(GameState):
             for event in pygame.event.get():
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:
-                        return "game_menu"
+                        return "main_menu"
 
     def entry_actions(self):
         self.about_file = open(ABOUT_FILE, "r", 1)
@@ -404,7 +418,7 @@ class ExitConfirmMenu(GameState):
                         pygame.quit()
                         exit()
                     elif event.key == K_n:
-                        return "game_menu"
+                        return "main_menu"
 
 class GamePlayMenu(GameState):
     def __init__(self, name):
@@ -509,7 +523,7 @@ class GameResultMenu(GameState):
             for event in pygame.event.get():
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:
-                        return "game_menu"
+                        return "main_menu"
 
     def entry_actions(self):
         if GameApp.isHighScore():
@@ -548,7 +562,7 @@ class PauseScreenMenu(GameState):
                         return "game_play"
                     elif event.key == K_q:
                         GameApp.game_state = "not_running"
-                        return "game_menu"
+                        return "main_menu"
                         
             return None
 
@@ -662,7 +676,7 @@ class GameApp():
     def create_menus(cls):
         cls.menu_system.add_state(SplashScreenMenu("splash_screen"))
         cls.menu_system.add_state(SelectPlayerMenu("select_player"))
-        cls.menu_system.add_state(MainMenu("game_menu"))
+        cls.menu_system.add_state(MainMenu("main_menu"))
         cls.menu_system.add_state(ExitConfirmMenu("exit_confirm"))
         cls.menu_system.add_state(CreatePlayerMenu("create_player"))
         cls.menu_system.add_state(AboutMenu("about"))
