@@ -205,55 +205,65 @@ class SelectPlayerMenu(GameState):
 class CreatePlayerMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
-        self.name_string = ""
-        #self.button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((350, 150), (100, 50)), text="New Button", manager=GameApp.manager)
+        self.time_delta = 0.0
         self.internal_clock = pygame.time.Clock()
- 
+        self.initialize_gui_elements()
+
+    def initialize_gui_elements(self):
+        pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((384, 100), (600, 40)), text="CREATE A NEW PLAYER", manager=self.gui_manager)
+        self.text_box = pygame_gui.elements.UITextEntryLine(relative_rect=pygame.Rect((384, 200), (600, 40)), manager=self.gui_manager)
+        self.cancel_button = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((480, 350), (175, 40)), text="CANCEL", manager=self.gui_manager)
+        self.save_button = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((700, 350), (175, 40)), text="SAVE", manager=self.gui_manager)
+
     def do_actions(self):
-        super().do_actions()
+        if len(self.text_box.get_text()) <= 0:
+            self.save_button.disable()
+        else:
+            self.save_button.enable()
+
         GameApp.screen.fill(BLACK)
-        title_font = pygame.font.SysFont("inconsolata", 32, bold=True)
-        name_font = pygame.font.SysFont("inconsolata", 28)
-        title_text = "Please enter the name of the new player:"
-        title_surface = title_font.render(title_text, True, WHITE, BLACK)
-       
-        name_surface = name_font.render(self.name_string, True, BLACK, WHITE)
-        GameApp.screen.blit(name_surface, (SCREEN_SIZE[0]/2 - 200, SCREEN_SIZE[1]/2 - 100))
-        GameApp.screen.blit(title_surface, (SCREEN_SIZE[0]/2 - 200, SCREEN_SIZE[1]/2 - 200))
+        self.time_delta = GameApp.game_clock.tick(60)/1000.0
+        self.gui_manager.update(self.time_delta)
+        self.gui_manager.draw_ui(GameApp.screen)
         pygame.display.update()
 
     def check_conditions(self):
-        time_delta = self.internal_clock.tick(60)/1000.0
         for event in pygame.event.get():
-            GameApp.gui_manager.process_events(event)
+            self.gui_manager.process_events(event)
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
                     return "select_player"
-                elif event.key == K_BACKSPACE:
-                    strlen = len(self.name_string)
-                    self.name_string = self.name_string[:(strlen-1)]
-                    return None
                 elif event.key == K_RETURN:
-                    if len(self.name_string) > 0:
+                    inp = self.text_box.get_text()
+                    if len(inp) > 0:
                         with open(PLAYER_DATA_FILE, "a") as player_data_file:
                             field_names = ["name", "score"]
                             writer = csv.DictWriter(player_data_file, fieldnames=field_names)
-                            writer.writerow({"name": self.name_string, "score": 0})
-     
-                        return "select_player"
-                else:
-                    self.name_string += event.unicode
-                    return None
+                            writer.writerow({"name": inp, "score": 0})
 
-        GameApp.gui_manager.update(time_delta)
-        GameApp.gui_manager.draw_ui(GameApp.screen)
-        pygame.display.update()
+                        return "select_player"
+                    else:
+                        return None 
+            elif event.type == pygame.USEREVENT:
+                if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                    if event.ui_element == self.cancel_button:
+                        return "select_player"
+                    elif event.ui_element == self.save_button:
+                        inp = self.text_box.get_text()
+                        if len(inp) > 0:
+                            with open(PLAYER_DATA_FILE, "a") as player_data_file:
+                                field_names = ["name", "score"]
+                                writer = csv.DictWriter(player_data_file, fieldnames=field_names)
+                                writer.writerow({"name": inp, "score": 0})
+                            return "select_player"
+                        else:
+                            return None
 
     def entry_actions(self):
-        self.name_string = ""
+        self.text_box.set_text("")
 
     def exit_actions(self):
-        GameApp.player_list = sync_player_list() 
+        GameApp.player_list = sync_player_list()
 
 class MainMenu(GameState):
     def do_actions(self):
