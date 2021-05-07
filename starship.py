@@ -52,7 +52,7 @@ def sync_high_score_list(new_list = None):
     return sync_list(HIGH_SCORE_FILE, new_list)
 
 def sync_list(source_file, new_player_list = None):
-            if not new_player_list is None:          
+            if not new_player_list is None:
                 with open(source_file, "w") as player_data_file:
                     if len(new_player_list) == 0:
                         player_data_file.truncate(0)
@@ -514,34 +514,40 @@ class GamePlayMenu(GameState):
 class GameResultMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
-        self.menu_message = "Game Over!"
+        self.menu_message = "GAME OVER"
+        self.time_delta = 0.0
+        self.internal_clock = pygame.time.Clock()
+        self.initialize_gui_elements()
+
+    def initialize_gui_elements(self):
+        self.menu_title = pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((383, 160), (600, 40)), manager=self.gui_manager, text="GAME OVER")
+        self.score_label = pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((383, 250), (600, 40)), manager=self.gui_manager, text="Your score:")
+        self.continue_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((808, 350), (175, 40)), text="CONTINUE", manager=self.gui_manager)
 
     def do_actions(self):
+        self.time_delta = GameApp.game_clock.tick(60)/1000.0
         GameApp.screen.fill((0, 0, 0, 0.5))
-        title_font = pygame.font.SysFont("inconsolata", 32, bold=True)
-        title_surface = title_font.render(self.menu_message, True, WHITE, BLACK)
-        title_width, title_height = title_surface.get_size()
-        GameApp.screen.blit(title_surface, (SCREEN_SIZE[0]/2 - title_width/2, SCREEN_SIZE[1]/2 - 50))
-        text_font = pygame.font.SysFont("inconsolata", 28)
-        text_surface = text_font.render("Collision", True, WHITE, BLACK)
-        text_width, text_height = text_surface.get_size()
-        GameApp.screen.blit(text_surface, (SCREEN_SIZE[0]/2 -text_width/2, SCREEN_SIZE[1]/2))
-        score_surface = text_font.render("Your Score: " + str(GameApp.current_score), True, WHITE, BLACK)
-        score_width, score_height = score_surface.get_size()
-        GameApp.screen.blit(score_surface, (SCREEN_SIZE[0]/2 -score_width/2, SCREEN_SIZE[1]/2 + score_height))
+        self.gui_manager.update(self.time_delta)
+        self.gui_manager.draw_ui(GameApp.screen)
         pygame.display.update()
 
     def check_conditions(self):
-        while True:
-            self.time_delta = GameApp.game_clock.tick(60)/1000.0
-            for event in pygame.event.get():
-                if event.type == KEYDOWN:
-                    if event.key == K_ESCAPE:
+        for event in pygame.event.get():
+            self.gui_manager.process_events(event)
+            if event.type == KEYDOWN:
+                if event.key == K_RETURN:
+                    return "main_menu"
+            elif event.type == pygame.USEREVENT:
+                if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                    if event.ui_element == self.continue_btn:
                         return "main_menu"
 
     def entry_actions(self):
+        self.score_label.set_text("Your score: " + str(GameApp.current_score))
         if GameApp.isHighScore():
-            self.menu_message = "High Score!"
+            self.menu_title.set_text("CONGRATULATIONS: HIGH SCORE!")
+        else:
+            self.menu_title.set_text("GAME OVER!")
     
     def exit_actions(self):
         #Save game result to high-score/ personal-best file if required
@@ -551,34 +557,40 @@ class GameResultMenu(GameState):
             GameApp.current_player.high_score = GameApp.current_score 
 
 class PauseScreenMenu(GameState):
+    def __init__(self, name):
+        super().__init__(name)
+        self.time_delta = 0.0
+        self.internal_clock = pygame.time.Clock()
+        self.initialize_gui_elements()
+
+    def initialize_gui_elements(self):
+        self.menu_title = pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((383, 160), (600, 40)), text="GAME PAUSED", manager=self.gui_manager)
+        self.question_label = pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((383, 250), (600, 40)), text="What do you want to do?", manager=self.gui_manager)
+        self.quit_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((480, 350), (175, 40)), text="QUIT GAME", manager=self.gui_manager)
+        self.resume_btn = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((700, 350), (175, 40)), text="RESUME GAME", manager=self.gui_manager)
+
     def do_actions(self):
-        symbol = "||"
-        text = "PAUSED"
-        quit_option = "Quit"
-        resume_option = "Resume"
-        font = pygame.font.SysFont("inconsolata", 64)
-        symbol_surface = font.render(symbol, True, WHITE, BLACK)
-        text_surface = font.render(text, True, WHITE, BLACK)
-        quit_surface = font.render(quit_option, True, WHITE, BLACK)
-        resume_surface = font.render(resume_option, True, WHITE, BLACK)
-        GameApp.screen.blit(symbol_surface, (SCREEN_SIZE[0]/2-25, SCREEN_SIZE[1]/2-100))
-        GameApp.screen.blit(text_surface, (SCREEN_SIZE[0]/2-65, SCREEN_SIZE[1]/2))
-        GameApp.screen.blit(quit_surface, (SCREEN_SIZE[0]/2-150, SCREEN_SIZE[1]/2+50))
-        GameApp.screen.blit(resume_surface, (SCREEN_SIZE[0]/2+65, SCREEN_SIZE[1]/2+50))
+        self.time_delta = GameApp.game_clock.tick(60)/1000.0
+        self.gui_manager.update(self.time_delta)
+        self.gui_manager.draw_ui(GameApp.screen)
         pygame.display.update()
 
     def check_conditions(self):
-        while True:
-            self.time_delta = GameApp.game_clock.tick(60)/1000.0
-            for event in pygame.event.get():
-                if event.type == KEYDOWN:
-                    if event.key == K_ESCAPE or event.key == K_r:
+        for event in pygame.event.get():
+            self.gui_manager.process_events(event)
+            if event.type == KEYDOWN:
+                if event.key == K_ESCAPE or event.key == K_r:
+                    return "game_play"
+                elif event.key == K_q:
+                    GameApp.game_state = "not_running"
+                    return "main_menu"
+            elif event.type == pygame.USEREVENT:
+                if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                    if event.ui_element == self.resume_btn:
                         return "game_play"
-                    elif event.key == K_q:
-                        GameApp.game_state = "not_running"
+                    elif event.ui_element == self.quit_btn:
                         return "main_menu"
-                        
-            return None
+        return None
 
 class GameAsset(object):
     def __init__(self, world, x_location = 0.0, y_location = 0.0):
