@@ -8,6 +8,7 @@ import time
 import csv
 import os
 from pathlib import Path
+from models import Player, Score, Session 
 
 SCREEN_SIZE = (1366, 768)
 WHITE = (255, 255, 255)
@@ -15,8 +16,6 @@ BLACK = (0, 0, 0)
 SPACECRAFT_SPEED = 400
 
 INTRO_SCREEN_FILE = "images/SplashScreenImage.png"
-PLAYER_DATA_FILE = "user_data/player_data.csv"
-HIGH_SCORE_FILE = "user_data/high_scores.csv"
 ABOUT_FILE = "README.md"
 
 class MenuStateMachine(object):
@@ -45,40 +44,6 @@ class MenuStateMachine(object):
 
         self.active_state = self.states[new_state_name]
         self.active_state.entry_actions()
-
-def sync_player_list(new_list = None):
-    return sync_list(PLAYER_DATA_FILE, new_list)
-
-def sync_high_score_list(new_list = None):
-    return sync_list(HIGH_SCORE_FILE, new_list)
-
-def sync_list(source_file, new_player_list = None):
-            if not new_player_list is None:
-                with open(source_file, "w") as player_data_file:
-                    if len(new_player_list) == 0:
-                        player_data_file.truncate(0)
-                    else:
-                        field_names = ["name", "score"]
-                        writer = csv.DictWriter(player_data_file, fieldnames=field_names)
-                        for row in new_player_list:
-                            writer.writerow({"name": row[0], "score": row[1]})
-
-            player_list = []
-
-            if os.path.exists(source_file):
-                with open(source_file, "r") as player_data_file:
-                    reader = csv.reader(player_data_file)
-                    for row in reader:
-                        player_name = row[0]
-                        high_score = int(row[1])
-                        player_list.append([player_name, high_score])
-            
-            return player_list
-
-class Player(object):
-    def __init__(self, name, highest_score):
-        self.name = name
-        self.high_score = highest_score
 
 class GameState(metaclass=ABCMeta):
     def __init__(self, name):
@@ -130,14 +95,14 @@ class SplashScreenMenu(GameState):
 
 class SelectPlayerMenu(GameState):
     def initialize_gui_elements(self):
-        pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((384, 100), (600, 40)), text="SELECT A PLAYER", manager=self.gui_manager )
-        pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((384, 150), (600, 40)), text="TO CREATE A NEW PLAYER PRESS 'C'", manager=self.gui_manager )
+        pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((384, 100), (600, 40)), text="SELECT A PLAYER", manager=self.gui_manager)
+        pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((384, 150), (600, 40)), text="TO CREATE A NEW PLAYER PRESS 'C'", manager=self.gui_manager)
         pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((384, 200), (600, 40)), text="TO DELETE A PLAYER PRESS 'X'", manager=self.gui_manager)
 
         my_list = []
-        for item in GameApp.player_list:
-            my_list.append(item[0])
-            
+        for player in GameApp.get_player_list():
+            my_list.append(player[0])
+                    
         self.selection_list = pygame_gui.elements.ui_selection_list.UISelectionList(relative_rect= pygame.Rect((384,250), (600,300)), item_list= my_list, manager= self.gui_manager)
 
         self.delete_player_button = pygame_gui.elements.ui_button.UIButton(relative_rect=pygame.Rect((384, 550), (175, 40)), text="DELETE", manager=self.gui_manager)
@@ -146,8 +111,8 @@ class SelectPlayerMenu(GameState):
 
     def refresh_gui_elements(self):
         my_list = []
-        for item in GameApp.player_list:
-            my_list.append(item[0])
+        for player in GameApp.get_player_list():
+            my_list.append(player[0])
 
         self.selection_list.set_item_list(my_list)
 
@@ -166,8 +131,7 @@ class SelectPlayerMenu(GameState):
             self.gui_manager.process_events(event)
             if event.type == KEYDOWN:
                 if event.key == K_RETURN:
-                    GameApp.current_player.name = self.selection_list.get_single_selection()
-                    GameApp.current_player.high_score =  int([player[1] for player in GameApp.player_list if player[0] == GameApp.current_player.name][0])
+                    GameApp.current_player = GameApp.session.query(Player).filter_by(name=self.selection_list.get_single_selection()).first()
                     return "main_menu"
                 elif event.key == K_DOWN:
                     #Keyboard navigation desirable for selection-list
@@ -179,29 +143,29 @@ class SelectPlayerMenu(GameState):
                     return "create_player"
                 elif event.key == K_x:
                     if len(GameApp.player_list) > 0:
-                        [GameApp.player_list.remove(player) for player in GameApp.player_list if player[0] == self.selection_list.get_single_selection()]
-                        GameApp.player_list = sync_player_list(GameApp.player_list)
+                        old_player = GameApp.session.query(Player).filter_by(name=self.selection_list.get_single_selection()).first()
+                        GameApp.session.delete(old_player)
+                        GameApp.refresh_high_scores()
                         self.refresh_gui_elements()
                         return None
 
             if event.type == pygame.USEREVENT:
                 if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
                     if event.ui_element == self.continue_button:
-                        GameApp.current_player.name = self.selection_list.get_single_selection()
-                        GameApp.current_player.high_score =  int([player[1] for player in GameApp.player_list if player[0] == GameApp.current_player.name][0])
+                        GameApp.current_player = GameApp.session.query(Player).filter_by(name=self.selection_list.get_single_selection()).first()
                         return "main_menu"
                     elif event.ui_element == self.delete_player_button:
                         if len(GameApp.player_list) > 0:
-                            [GameApp.player_list.remove(player) for player in GameApp.player_list if player[0] == self.selection_list.get_single_selection()]
-                            GameApp.player_list = sync_player_list(GameApp.player_list)
+                            old_player = GameApp.session.query(Player).filter_by(name=self.selection_list.get_single_selection()).first()
+                            GameApp.session.delete(old_player)
+                            GameApp.refresh_high_scores()
                             self.refresh_gui_elements()
                             return None
                     elif event.ui_element == self.create_player_button:
                         return "create_player"
 
     def entry_actions(self):
-        GameApp.player_list = sync_player_list()
-        self.highlight_index = 0
+        GameApp.player_list = GameApp.get_player_list()
         self.refresh_gui_elements()
 
 class CreatePlayerMenu(GameState):
@@ -228,11 +192,8 @@ class CreatePlayerMenu(GameState):
                 elif event.key == K_RETURN:
                     inp = self.text_box.get_text()
                     if len(inp) > 0:
-                        with open(PLAYER_DATA_FILE, "a") as player_data_file:
-                            field_names = ["name", "score"]
-                            writer = csv.DictWriter(player_data_file, fieldnames=field_names)
-                            writer.writerow({"name": inp, "score": 0})
-
+                        new_player = Player(name=inp)
+                        GameApp.session.add(new_player)
                         return "select_player"
                     else:
                         return None 
@@ -243,10 +204,8 @@ class CreatePlayerMenu(GameState):
                     elif event.ui_element == self.save_button:
                         inp = self.text_box.get_text()
                         if len(inp) > 0:
-                            with open(PLAYER_DATA_FILE, "a") as player_data_file:
-                                field_names = ["name", "score"]
-                                writer = csv.DictWriter(player_data_file, fieldnames=field_names)
-                                writer.writerow({"name": inp, "score": 0})
+                            new_player = Player(name=inp)
+                            GameApp.session.add(new_player)
                             return "select_player"
                         else:
                             return None
@@ -255,7 +214,7 @@ class CreatePlayerMenu(GameState):
         self.text_box.set_text("")
 
     def exit_actions(self):
-        GameApp.player_list = sync_player_list()
+        pass
 
 class MainMenu(GameState):
     def initialize_gui_elements(self):
@@ -309,11 +268,12 @@ class HighScoresMenu(GameState):
         #GameApp.screen.blit(title1_surface, (SCREEN_SIZE[0]/2 - 400, 200))
 
         count = 0
-        for player in GameApp.high_score_list:
+        #for player in GameApp.high_score_list:
+        for score in GameApp.high_score_list:
             FORE = BLACK
             BACK = WHITE
 
-            name_surface = list_font.render(player[0] + " - " + str(player[1]), True, FORE, BACK)
+            name_surface = list_font.render(score[0] + " - " + str(score[1]), True, FORE, BACK)
             GameApp.screen.blit(name_surface, (SCREEN_SIZE[0]/2 - 300, 230 +(count*30)))
             count += 1
 
@@ -337,9 +297,9 @@ class AboutMenu(GameState):
     def initialize_gui_elements(self):
         self.title_label = pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((383, 160), (600, 40)), text="ABOUT STARSHIP ODYSSEY", manager=self.gui_manager)
         about_file = open(ABOUT_FILE, "r", 1)
-        string = ""
+        string = str()
         for line in about_file:
-            string += line
+            string += string.join(line)
 
         about_file.close()
             
@@ -378,13 +338,13 @@ class ExitConfirmMenu(GameState):
                     if event.ui_element == self.back_btn:
                         return "main_menu"
                     elif event.ui_element == self.confirm_btn:
+                        GameApp.session.commit()
                         pygame.quit()
                         exit()
 
 class GamePlayMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
-        #self.game_state = "not_running"
         self.reset_game()
     
     def reset_game(self):
@@ -420,7 +380,7 @@ class GamePlayMenu(GameState):
 
     def display_player_stats(self):
         player_font = pygame.font.SysFont("inconsolata", 32, bold=True)
-        player_surface = player_font.render("PLAYER: " + str(GameApp.current_player.name) + " HIGH SCORE: " + str(GameApp.current_player.high_score), True, WHITE, BLACK)
+        player_surface = player_font.render("PLAYER: " + str(GameApp.current_player.name) + " HIGH SCORE: " + str(GameApp.current_player.personal_best), True, WHITE, BLACK)
         GameApp.screen.blit(player_surface, (0, 40))
 
     def check_conditions(self):
@@ -461,7 +421,6 @@ class GamePlayMenu(GameState):
 class GameResultMenu(GameState):
     def __init__(self, name):
         super().__init__(name)
-        #self.menu_message = "GAME OVER"
         
     def initialize_gui_elements(self):
         self.menu_title = pygame_gui.elements.ui_label.UILabel(relative_rect=pygame.Rect((383, 160), (600, 40)), manager=self.gui_manager, text="GAME OVER")
@@ -484,17 +443,31 @@ class GameResultMenu(GameState):
 
     def entry_actions(self):
         self.score_label.set_text("Your score: " + str(GameApp.current_score))
-        if GameApp.isHighScore():
+        new_score = Score(score=GameApp.current_score, player_id=GameApp.current_player.id)
+        GameApp.session.add(new_score)
+        GameApp.session.commit()
+        
+        #Check if the game result is a high-score
+        if GameApp.current_score > (GameApp.high_score_list[len(GameApp.high_score_list)-1][1] if GameApp.high_score_list else 0):
             self.menu_title.set_text("CONGRATULATIONS: HIGH SCORE!")
         else:
             self.menu_title.set_text("GAME OVER!")
-    
+            
     def exit_actions(self):
-        #Save game result to high-score/ personal-best file if required
-        GameApp.update_high_scores(Player(GameApp.current_player.name, GameApp.current_score))
-        GameApp.update_player_data(Player(GameApp.current_player.name, GameApp.current_score))
-        if GameApp.current_score > GameApp.current_player.high_score:
-            GameApp.current_player.high_score = GameApp.current_score 
+        if GameApp.current_score > GameApp.current_player.personal_best:
+            #Adjust the current player's personal best
+            GameApp.current_player.personal_best = GameApp.current_score 
+            GameApp.session.add(GameApp.current_player)
+
+            #Refresh Current Player
+            GameApp.current_player = GameApp.session.query(Player).get(GameApp.current_player.id)
+
+        #Refresh the High-Score List
+        GameApp.high_score_list = []
+        high_scores = GameApp.session.query(Score).order_by(Score.score.desc()).limit(10).all()
+
+        for score in high_scores:
+            GameApp.high_score_list.append((score.player.name, score.score))
 
 class PauseScreenMenu(GameState):
     def initialize_gui_elements(self):
@@ -520,6 +493,7 @@ class PauseScreenMenu(GameState):
                     if event.ui_element == self.resume_btn:
                         return "game_play"
                     elif event.ui_element == self.quit_btn:
+                        GameApp.game_state = "not_running"
                         return "main_menu"
         return None
 
@@ -599,31 +573,26 @@ class GameApp():
     screen = None 
     player_list = None 
     current_player = None 
-    high_score_list = None 
+    high_score_list = []
     menu_system = None
     game_state = "not_running"
     game_clock = None
     gui_manager = None
+    session = None
 
     @classmethod
     def initialize(cls):
+        cls.session = Session()
         cls.current_score = 0
         pygame.init()
         cls.screen = pygame.display.set_mode(SCREEN_SIZE, FULLSCREEN, 32)
         cls.gui_manager = pygame_gui.UIManager(SCREEN_SIZE)
         cls.game_clock = pygame.time.Clock()
-        cls.player_list = sync_player_list()
-        cls.current_player = Player("default_player", 0)
-        cls.high_score_list = sync_high_score_list()
+        cls.player_list = cls.get_player_list()
+        cls.current_player = Player(name="default_player")
         cls.menu_system = MenuStateMachine()
+        cls.refresh_high_scores()
         cls.create_menus()
-        
-        #Set-up user-data files
-        if not os.path.isdir("user_data"):
-            os.mkdir("user_data")
-
-        Path(HIGH_SCORE_FILE).touch()
-        Path(PLAYER_DATA_FILE).touch()
 
     @classmethod
     def run(cls):
@@ -645,6 +614,14 @@ class GameApp():
 
     @classmethod
     def isHighScore(cls):
+        if GameApp.current_score > GameApp.high_score_list[9][1]:
+            return True
+        else:
+            return False
+
+
+    @classmethod
+    def dep_isHighScore(cls):
         if len(cls.high_score_list) < 10:
             return True
 
@@ -658,36 +635,31 @@ class GameApp():
             return True
 
     @classmethod
-    def update_high_scores(cls, player):
-        list_length = len(cls.high_score_list)
-        if list_length == 0:
-            cls.high_score_list.append([player.name, player.high_score])
-        elif list_length < 10:
-            for index in range(0, list_length):
-                if cls.high_score_list[index][1] < player.high_score:
-                    cls.high_score_list.insert(index, [player.name, player.high_score])
-                    break
-            else:
-                cls.high_score_list.append([player.name, player.high_score])
-        else:
-            for index in range(0, list_length):
-                if cls.high_score_list[index][1] < player.high_score:
-                    cls.high_score_list.insert(index, [player.name, player.high_score])
-                    break
+    def add_new_player(cls, player_name):
+        new_player = Player(name="player_name")
+        cls.session.add(new_player)
 
-        while len(cls.high_score_list) > 10:
-            cls.high_score_list.pop()
-
-        cls.high_score_list = sync_high_score_list(cls.high_score_list)
-    
     @classmethod
-    def update_player_data(cls, player):
-        for pl in cls.player_list:
-            if pl[0] == player.name:
-                if pl[1] < player.high_score:
-                    pl[1] = player.high_score
+    def delete_player(cls, player_name):
+        player = cls.session.query(Player).filter_by(name=player_name).first()
+        cls.session.delete(player)
 
-        cls.player_list = sync_player_list(cls.player_list)
+    @classmethod
+    def get_player_list(cls):
+        player_list = []
+        players = cls.session.query(Player).all()
+        for player in players:
+            player_list.append((player.name, player.personal_best)) 
+
+        return player_list
+
+    @classmethod
+    def refresh_high_scores(cls):
+        cls.high_score_list = []
+        scores = cls.session.query(Score).order_by(Score.score.desc()).limit(10).all()
+
+        for score in scores:
+            cls.high_score_list.append((score.player.name, score.score))
 
 if __name__ == "__main__":
     GameApp.initialize()
