@@ -5,3 +5,4 @@ test*.py
 *.xcf
 *.jpg
 game_data.db
+*others*
